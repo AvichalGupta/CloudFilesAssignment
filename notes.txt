@@ -1,0 +1,92 @@
+Flow:
+    User logs in via Gmail.
+        If new User
+            Ask Full Name, Photo(optional), Organisation (optional), Country, Phone Number(optional).
+            Create user record.
+            Create Login Token.
+        Else
+            Create Login Token.
+    Save Login Token.
+
+    User Flow
+        Read available rooms.
+            Read available bookings.
+            Book based on availablility.
+
+    Admin Flow
+        See Roles section.
+
+
+Database Schema:
+
+PostgresSQL
+    lenders
+        id PK integer
+        name varchar(100) not null
+        email varchar(150) not null
+        is_active boolean default false not null
+        is_deleted boolean default false not null
+        created_at timestamp default now() not null
+        updated_at timestamp default now() not null
+
+    organisations
+        id PK integer
+        name varchar(100) not null
+        email varchar(150) not null
+        is_active boolean default false not null
+        is_deleted boolean default false not null
+        created_at timestamp default now() not null
+        updated_at timestamp default now() not null
+
+    users
+        id PK integer
+        fullName varchar(100) not null
+        email varchar(150) not null
+        employeeId varchar(100) null
+        created_at timestamp default now() not null
+        updated_at timestamp default now() not null
+
+    rooms
+        id PK integer
+        lender_id FK (lenders.id) integer
+        name varchar(255) not null
+        maxCapacity smallint not null
+        location point not null
+        available_from timestamp not null
+        is_active boolean default false not null
+        is_deleted boolean default false not null
+        list_room boolean default false not null
+        price smallint not null
+        min_booking_time smallint not null
+        min_booking_interval smallint not null
+        created_at timestamp default now() not null
+        updated_at timestamp default now() not null
+
+    bookings
+        id varchar(6) (using just (a-z + A-Z + 0-9) total 62 charachters, a 6 letter word can be combined ~57 billion times)
+        host_user_id FK (users.id)
+        participants_user_id integer[] FK[](users.id)
+        starts_at timestamp not null
+        ends_at timestamp not null
+        is_active boolean default false not null
+        is_deleted boolean default false not null
+        created_at timestamp default now() not null
+        updated_at timestamp default now() not null
+
+    admin
+        username varchar(100)
+        password text
+        created_at timestamp default now() not null
+        updated_at timestamp default now() not null
+
+
+MongoDB
+    roomsMetaData
+        roomId number PK (rooms.id)
+        metadata
+
+
+Roles:
+Admin - Can perform CRUD on all entities, lenders, organisations, users, rooms, bookings.
+LenderAdmin - Can perfrom CRUD on all their rooms and bookings. Can additionally update and read their own lenders data.
+OrganisationsAdmin - Can perform CRUD their users and bookings. Can additionally update and read their own organisations data.
