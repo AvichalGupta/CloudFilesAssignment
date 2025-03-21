@@ -1,98 +1,103 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# CloudFilesAssignment
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+## Overview
+This repository is a NestJS-based application that manages room bookings along with users, lenders, and organisations. The system allows different roles to interact with the application to perform actions such as room creation, booking, and more.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Prerequisites
+- Node.js (>= 22.x)
+- npm
 
-## Description
+## Installation
+1. Clone the repository:
+   ```
+   git clone <repository-url>
+   ```
+2. Change directory to the project:
+   ```
+   cd CloudFilesAssignment
+   ```
+3. Install dependencies:
+   ```
+   npm install
+   ```
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ npm install
+## Running the Application
+To run the application in development mode:
 ```
-
-## Compile and run the project
-
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm run start:dev
 ```
+By default, the server runs on port 3000.
 
-## Run tests
+## Testing the Application
 
-```bash
-# unit tests
-$ npm run test
+### Lender Flow
+1. **Sign Up as Lender:** Use the sign-up endpoint to create a lender account.
+2. **Login as Lender:** Log in using lender credentials.
+3. **Create a Room:** After logging in as a lender, create a new room via the appropriate endpoint.
 
-# e2e tests
-$ npm run test:e2e
+### Organisation Flow
+1. **Sign Up as Organisation:** Register as an organisation to generate an organisation ID (orgId).
 
-# test coverage
-$ npm run test:cov
-```
+### User Flow
+1. **Sign Up as User:** Register a new user account.
+2. **Login as User:** Log in using user credentials.
+3. **Book Rooms:** Once logged in, book available rooms.
 
-## Deployment
+## Room Slots Update Logic
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+- When a room is deleted, its available slots and subsequent bookings are also deleted.
+- When a room's availableFrom is updated, the available slots are recalculated. Any bookings that were made for a date that is before the new availableFrom and after the old availableFrom will be deleted. All other bookings will remain intact.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## API Endpoints
 
-```bash
-$ npm install -g mau
-$ mau deploy
-```
+### Authentication
+- **POST /auth/signup**: Register a new account. Accepts role-specific details (lender, organisation, or user) and returns a token upon successful creation.
+- **POST /auth/login**: Authenticate a user and provide an access token for authorized endpoints.
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Rooms API
+- **POST /rooms**: Create a new room.
+  - **Description:** Endpoint for lenders to create a room. Accepts room details such as name, description, capacity, amenities, and location.
+  - **Use Case:** Adding a new room to the system for future bookings.
+- **GET /rooms**: Retrieve a list of all rooms.
+  - **Description:** Returns all available rooms for viewing.
+  - **Use Case:** Allows lenders and users to see available rooms for management or booking.
+- **GET /rooms/:id**: Retrieve detailed information about a specific room.
+  - **Description:** Provides full details of a room including availability, amenities, and current booking status.
+  - **Use Case:** Viewing room information prior to booking or for administrative review.
+- **PUT /rooms/:id**: Update room information.
+  - **Description:** Enables lenders to modify room data such as features, pricing, or availability.
+  - **Use Case:** Adjusting details of a room when changes occur or errors need correcting.
+- **DELETE /rooms/:id**: Delete a room.
+  - **Description:** Removes a room from the system.
+  - **Use Case:** Deleting rooms that are no longer available or needed.
 
-## Resources
+### Bookings API
+- **POST /bookings**: Create a new booking.
+  - **Description:** Allows authenticated users to reserve a room by providing booking dates and preferences.
+  - **Use Case:** Reserving a room for a specified time period.
+- **GET /bookings**: Retrieve a list of bookings.
+  - **Description:** Returns all bookings for the authenticated user, or all bookings for an administrator.
+  - **Use Case:** Reviewing current and past booking activities.
+- **GET /bookings/:id**: Retrieve detailed information about a specific booking.
+  - **Description:** Shows complete details of a booking including room information, booking dates, and status.
+  - **Use Case:** Checking the specifics of a particular booking.
+- **PUT /bookings/:id**: Update a booking.
+  - **Description:** Allows changes to booking details, such as date adjustments or room modifications.
+  - **Use Case:** Modifying a booking when plans change.
+- **DELETE /bookings/:id**: Cancel a booking.
+  - **Description:** Enables users to cancel a booking, freeing up the room.
+  - **Use Case:** Releasing a previously reserved room if the booking is no longer needed.
 
-Check out a few resources that may come in handy when working with NestJS:
+### Additional Endpoints
+- **Lenders API:** Endpoints within the `src/lenders` module manage lender-specific operations such as retrieving account details and handling room management tasks.
+- **Organisations API:** Endpoints in the `src/organisations` module handle organisation registration and management, primarily used during sign-up to generate an orgId.
+- **Users API:** Endpoints in the `src/users` module focus on managing user details and facilitating booking-related operations.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Conclusion
+This project supports multiple roles — lender, organisation, and user — and provides comprehensive APIs for room management and bookings. The endpoints detailed above cover room creation, updating, deletion, and complete CRUD operations for bookings. Follow the testing steps to simulate the flow:
+- First, sign up as a lender, log in, and create a room.
+- Then, sign up as an organisation to create an orgId.
+- Finally, sign up as a user, log in, and book rooms.
 
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+POSTMAN LINK:
+https://elements.getpostman.com/redirect?entityId=9020780-9f9547f1-e95e-4062-8bbd-a769336b44c8&entityType=collection

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   IAddOrgPayload,
   IGetOrgByEmailPayload,
@@ -31,7 +31,7 @@ export class OrganisationsService {
 
     if (!doesOrganisationsExist) {
       throw {
-        statusCode: 404,
+        statusCode: HttpStatus.NOT_FOUND,
         message: 'Organisations does not exists with provided data.',
       };
     }
@@ -48,7 +48,7 @@ export class OrganisationsService {
 
     if (doesOrganisationsExist) {
       throw {
-        statusCode: 400,
+        statusCode: HttpStatus.BAD_REQUEST,
         message:
           'Organisations alredy exists with provided email, please login.',
       };

@@ -1,4 +1,5 @@
-import { HttpStatus, ForbiddenException } from '@nestjs/common';
+import { HttpStatus, ForbiddenException, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { Roles } from 'src/auth/auth.interface';
 import {
@@ -15,60 +16,54 @@ import {
 } from 'src/rooms/rooms.interface';
 import { UsersService } from 'src/users/users.service';
 
+@Injectable()
 export class RoomsAndBookingService {
   private rooms: Rooms[];
   private bookings: Bookings[];
-  private availableSlots: Map<string, { startsAt: Date; endsAt: Date }[]>;
+  private availableSlots: Map<
+    string,
+    { startsAt: Date; endsAt: Date; booked: boolean }[]
+  >;
   constructor(
     private readonly lenderService: LendersService,
     private readonly userService: UsersService,
+    private readonly configService: ConfigService,
   ) {
     this.rooms = [];
     this.bookings = [];
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() + 3);
-
-    this.availableSlots = new Map(
-      this.getAllRooms()
-        .filter((roomData) => {
-          return (
-            new Date(roomData.availableFrom).getTime() <= startDate.getTime()
-          );
-        })
-        .map((roomData) => {
-          return [
-            roomData.id,
-            this.getAvailableBookingSlots(roomData.id, new Date().toString()),
-          ];
-        }),
-    );
+    this.availableSlots = new Map();
   }
 
-  private getAvailableBookingSlots(roomId: string, startsAt: string) {
-    const roomData = this.getRoomById(roomId);
-
-    const endsAt = new Date(startsAt);
-    endsAt.setDate(endsAt.getDate() + 3);
+  // ---------------------------- BOOKINGS LOGIC STARTS ----------------------------
+  private getAvailableBookingSlots(roomData: Rooms) {
+    const endsAt = new Date(roomData.availableFrom);
+    endsAt.setDate(
+      endsAt.getDate() +
+        +this.configService.getOrThrow('MIN_BOOKING_INTERVAL_DAYS'),
+    );
 
     const minTimeIntervals = roomData.minBookingIntervalInMinutes * 60 * 1000;
 
     const bookingIntervals = Math.floor(
-      (endsAt.getTime() - new Date(startsAt).getTime()) / minTimeIntervals,
+      (endsAt.getTime() - new Date(roomData.availableFrom).getTime()) /
+        minTimeIntervals,
     );
 
-    const startingDate = new Date(startsAt);
+    const startingDate = new Date(roomData.availableFrom);
 
     let counter = 0;
-    const intervals: { startsAt: Date; endsAt: Date }[] = [];
+    const intervals: { startsAt: Date; endsAt: Date; booked: boolean }[] = [];
     while (counter <= bookingIntervals) {
+      const startDateCopy = new Date(startingDate);
+      startingDate.setMinutes(
+        startingDate.getMinutes() + roomData.minBookingIntervalInMinutes,
+      );
+      const endDateCopy = new Date(startingDate);
       intervals.push({
-        startsAt: startingDate,
-        endsAt: new Date(
-          startingDate.setMinutes(
-            startingDate.getMinutes() + roomData.minBookingIntervalInMinutes,
-          ),
-        ),
+        startsAt: startDateCopy,
+        endsAt: endDateCopy,
+        booked: false,
       });
       counter++;
     }
@@ -76,7 +71,7 @@ export class RoomsAndBookingService {
     return intervals;
   }
 
-  public getAllBookings() {
+  public getAllInternalBookings() {
     return this.bookings;
   }
 
@@ -84,7 +79,7 @@ export class RoomsAndBookingService {
     return this.availableSlots;
   }
 
-  public getAllInternalBookings(userDataFromToken: {
+  public getAllBookings(userDataFromToken: {
     id: string;
     type: Roles;
   }): Bookings[] {
@@ -94,8 +89,8 @@ export class RoomsAndBookingService {
           .filter((roomData) => {
             return roomData.lenderId === userDataFromToken.id;
           })
-          .map((roomObj) => {
-            return roomObj.id;
+          .map((roomObject) => {
+            return roomObject.id;
           });
 
         if (!lendersRoomIds.length) {
@@ -105,7 +100,7 @@ export class RoomsAndBookingService {
           };
         }
 
-        const bookings = this.getAllBookings().filter((bookingObj) => {
+        const bookings = this.getAllInternalBookings().filter((bookingObj) => {
           return lendersRoomIds.includes(bookingObj.roomId);
         });
 
@@ -135,7 +130,10 @@ export class RoomsAndBookingService {
           };
         }
 
-        const bookings = this.getAllBookings().filter((bookingObj) => {
+        console.log('employeeIds: ', orgsEmployees);
+
+        const bookings = this.getAllInternalBookings().filter((bookingObj) => {
+          console.log('booking employeeId: ', bookingObj);
           return orgsEmployees.includes(bookingObj.hostEmployeeId);
         });
 
@@ -149,7 +147,7 @@ export class RoomsAndBookingService {
         return bookings;
       }
       case Roles.USER: {
-        const bookings = this.getAllBookings().filter((bookingObj) => {
+        const bookings = this.getAllInternalBookings().filter((bookingObj) => {
           return bookingObj.hostEmployeeId === userDataFromToken.id;
         });
 
@@ -181,11 +179,11 @@ export class RoomsAndBookingService {
       case Roles.LENDER: {
         const roomData = this.getRoomById(roomId);
 
-        const roomBookings = this.getAllInternalBookings(
-          userDataFromToken,
-        ).filter((roomBooking) => {
-          return roomBooking.roomId === roomData.id;
-        });
+        const roomBookings = this.getAllBookings(userDataFromToken).filter(
+          (roomBooking) => {
+            return roomBooking.roomId === roomData.id;
+          },
+        );
 
         if (roomData.lenderId !== userDataFromToken.id) {
           return roomBookings.map((roomBookings) => {
@@ -201,7 +199,7 @@ export class RoomsAndBookingService {
       case Roles.ORG: {
         const roomData = this.getRoomById(roomId);
 
-        const roomBookingsByOrgEmployees = this.getAllInternalBookings(
+        const roomBookingsByOrgEmployees = this.getAllBookings(
           userDataFromToken,
         ).filter((roomBooking) => {
           return roomBooking.roomId === roomData.id;
@@ -212,7 +210,7 @@ export class RoomsAndBookingService {
       case Roles.USER: {
         const roomData = this.getRoomById(roomId);
 
-        const roomBookingsByUser = this.getAllInternalBookings(
+        const roomBookingsByUser = this.getAllBookings(
           userDataFromToken,
         ).filter((roomBooking) => {
           return roomBooking.roomId === roomData.id;
@@ -236,7 +234,7 @@ export class RoomsAndBookingService {
     },
     bookingId: string,
   ): Bookings {
-    const bookingData = this.getAllInternalBookings(userDataFromToken).filter(
+    const bookingData = this.getAllBookings(userDataFromToken).filter(
       (bookingData) => {
         return bookingData.id === bookingId;
       },
@@ -283,34 +281,42 @@ export class RoomsAndBookingService {
       };
     }
 
-    const roomBookings = this.getAllInternalBookings(userDataFromToken).filter(
-      (roomBooking) => {
-        return roomBooking.roomId === requestPayload.roomId;
-      },
-    );
-
-    const roomBookedOnDate = roomBookings.filter((roomBooking) => {
-      const bookingStartsAt = new Date(roomBooking.startsAt);
-      const bookingEndsAt = new Date(roomBooking.endsAt);
-      return (
-        (requestPayload.roomId === roomBooking.roomId &&
-          bookingStartsAt.getTime() === payloadStartsAt.getTime() &&
-          bookingEndsAt.getTime() === payloadEndsAt.getTime()) ||
-        (requestPayload.roomId === roomBooking.roomId &&
-          payloadStartsAt.getTime() >= bookingStartsAt.getTime() &&
-          payloadStartsAt.getTime() < bookingEndsAt.getTime()) ||
-        (requestPayload.roomId === roomBooking.roomId &&
-          payloadEndsAt.getTime() >= bookingStartsAt.getTime() &&
-          payloadEndsAt.getTime() < bookingEndsAt.getTime())
+    try {
+      const roomBookings = this.getAllBookings(userDataFromToken).filter(
+        (roomBooking) => {
+          return roomBooking.roomId === requestPayload.roomId;
+        },
       );
-    });
 
-    if (roomBookedOnDate.length) {
-      throw {
-        statausCode: HttpStatus.CONFLICT,
-        message:
-          'Room already booked, please select a different date time combination.',
-      };
+      const roomBookedOnDate = roomBookings.filter((roomBooking) => {
+        const bookingStartsAt = new Date(roomBooking.startsAt);
+        const bookingEndsAt = new Date(roomBooking.endsAt);
+        return (
+          (requestPayload.roomId === roomBooking.roomId &&
+            bookingStartsAt.getTime() === payloadStartsAt.getTime() &&
+            bookingEndsAt.getTime() === payloadEndsAt.getTime()) ||
+          (requestPayload.roomId === roomBooking.roomId &&
+            payloadStartsAt.getTime() >= bookingStartsAt.getTime() &&
+            payloadStartsAt.getTime() < bookingEndsAt.getTime()) ||
+          (requestPayload.roomId === roomBooking.roomId &&
+            payloadEndsAt.getTime() >= bookingStartsAt.getTime() &&
+            payloadEndsAt.getTime() < bookingEndsAt.getTime())
+        );
+      });
+
+      if (roomBookedOnDate.length) {
+        throw {
+          statausCode: HttpStatus.CONFLICT,
+          message:
+            'Room already booked, please select a different date time combination.',
+        };
+      }
+    } catch (error) {
+      console.error('Service level error ', {
+        fileName: RoomsAndBookingService.name,
+        methodName: this.addBooking.name,
+        error: error,
+      });
     }
 
     if (requestPayload.participantsEmployeeIds.length > roomData.maxCapacity) {
@@ -321,6 +327,13 @@ export class RoomsAndBookingService {
     }
 
     this.bookings.push(newlyAddedBooking);
+
+    this.editAvailableSlotsByRoomId(
+      requestPayload.roomId,
+      requestPayload.startsAt,
+      requestPayload.endsAt,
+      true,
+    );
 
     return {
       bookingId: newlyAddedBooking.id,
@@ -347,9 +360,26 @@ export class RoomsAndBookingService {
         requestPayload.participantsEmployeeIds;
     }
 
-    const bookingIndex = this.getAllInternalBookings(
-      userDataFromToken,
-    ).findIndex((booking) => bookingObject.id === booking.id);
+    const bookingIndex = this.getAllBookings(userDataFromToken).findIndex(
+      (booking) => bookingObject.id === booking.id,
+    );
+
+    if (requestPayload.startsAt || requestPayload.endsAt) {
+      // mark old booking as not booked.
+      this.editAvailableSlotsByRoomId(
+        bookingObject.roomId,
+        this.bookings[bookingIndex].startsAt,
+        this.bookings[bookingIndex].endsAt,
+      );
+
+      // mark new booking as booked.
+      this.editAvailableSlotsByRoomId(
+        bookingObject.roomId,
+        requestPayload.startsAt,
+        requestPayload.endsAt,
+        true,
+      );
+    }
 
     this.bookings[bookingIndex] = bookingObject;
 
@@ -363,10 +393,10 @@ export class RoomsAndBookingService {
     },
     bookingId: string,
   ) {
-    const bookingIndex = this.getAllInternalBookings(
-      userDataFromToken,
-    ).findIndex((booking) => booking.id === bookingId);
-
+    const bookings = this.getAllBookings(userDataFromToken);
+    const bookingIndex = bookings.findIndex(
+      (booking) => booking.id === bookingId,
+    );
     if (bookingIndex === -1) {
       throw {
         statusCode: HttpStatus.NOT_FOUND,
@@ -382,9 +412,22 @@ export class RoomsAndBookingService {
       });
     }
 
-    this.bookings.splice(bookingIndex, 1);
-  }
+    const bookingDetails = bookings[bookingIndex];
+    this.editAvailableSlotsByRoomId(
+      bookingDetails.roomId,
+      bookingDetails.startsAt,
+      bookingDetails.endsAt,
+    );
 
+    this.bookings.splice(bookingIndex, 1);
+
+    return {
+      deletedBookingId: bookingId,
+    };
+  }
+  // ---------------------------- BOOKINGS LOGIC ENDS ----------------------------
+
+  // ---------------------------- ROOMS LOGIC STARTS ----------------------------
   public getAllRooms(): Rooms[] {
     return this.rooms;
   }
@@ -430,7 +473,10 @@ export class RoomsAndBookingService {
         : new Date(),
       id: randomUUID(),
     };
+
     this.rooms.push(newlyAddedRoom);
+
+    this.createAvailableSlotsByRoomId(newlyAddedRoom);
 
     return {
       roomId: newlyAddedRoom.id,
@@ -474,23 +520,54 @@ export class RoomsAndBookingService {
     this.rooms[roomIndex] = roomObject;
 
     if (requestPayload.availableFrom) {
-      this.getBookingsByRoomId(userDataFromToken, requestPayload.id)
-        .filter((roomBooking) => {
-          return (
-            'status' in roomBooking &&
-            roomBooking.status === BookingStatus.SCHEDULED
-          );
-        })
-        .forEach((bookingObj) => {
-          if (
-            new Date(bookingObj.startsAt).getTime() <
-            new Date(requestPayload.availableFrom).getTime()
-          ) {
-            if ('id' in bookingObj) {
-              this.deleteBooking(userDataFromToken, bookingObj.id as string);
+      const availableSlotsToBeEdited: { startsAt: string; endsAt: string }[] =
+        [];
+      try {
+        this.getBookingsByRoomId(userDataFromToken, requestPayload.id)
+          .filter((roomBooking) => {
+            return (
+              'status' in roomBooking &&
+              roomBooking.status === BookingStatus.SCHEDULED
+            );
+          })
+          .forEach((bookingObj) => {
+            console.log(
+              'bookingObj in editRoom: ',
+              bookingObj,
+              new Date(bookingObj.startsAt).getTime(),
+              new Date(requestPayload.availableFrom).getTime(),
+              new Date(bookingObj.startsAt).getTime() <
+                new Date(requestPayload.availableFrom).getTime(),
+            );
+            if (
+              new Date(bookingObj.startsAt).getTime() <
+              new Date(requestPayload.availableFrom).getTime()
+            ) {
+              if ('id' in bookingObj) {
+                this.deleteBooking(userDataFromToken, bookingObj.id as string);
+              }
+            } else {
+              availableSlotsToBeEdited.push(bookingObj);
             }
-          }
+          });
+      } catch (error) {
+        console.error('Service level error ', {
+          fileName: RoomsAndBookingService.name,
+          methodName: this.editRoom.name,
+          error: error,
         });
+      }
+
+      this.removeAvailableSlotsByRoomId(requestPayload.id);
+      this.createAvailableSlotsByRoomId(roomObject);
+      availableSlotsToBeEdited.forEach((bookingObj) => {
+        this.editAvailableSlotsByRoomId(
+          requestPayload.id,
+          bookingObj.startsAt,
+          bookingObj.endsAt,
+          true,
+        );
+      });
     }
 
     return this.getRoomById(requestPayload.id);
@@ -507,7 +584,7 @@ export class RoomsAndBookingService {
 
     if (roomIndex === -1) {
       throw {
-        statusCode: 400,
+        statusCode: HttpStatus.BAD_REQUEST,
         message: 'Room does not exists',
       };
     }
@@ -521,17 +598,90 @@ export class RoomsAndBookingService {
     }
 
     this.rooms.splice(roomIndex, 1);
-    this.getBookingsByRoomId(userDataFromToken, roomId)
-      .filter((roomBooking) => {
-        return (
-          'status' in roomBooking &&
-          roomBooking.status === BookingStatus.SCHEDULED
-        );
-      })
-      .forEach((bookingObj) => {
-        if ('id' in bookingObj) {
-          this.deleteBooking(userDataFromToken, bookingObj.id as string);
-        }
+    try {
+      this.removeAvailableSlotsByRoomId(roomId);
+      this.getBookingsByRoomId(userDataFromToken, roomId)
+        .filter((roomBooking) => {
+          return (
+            'status' in roomBooking &&
+            roomBooking.status === BookingStatus.SCHEDULED
+          );
+        })
+        .forEach((bookingObj) => {
+          if ('id' in bookingObj) {
+            this.deleteBooking(userDataFromToken, bookingObj.id as string);
+          }
+        });
+    } catch (error) {
+      console.error('Controller level error ', {
+        fileName: RoomsAndBookingService.name,
+        methodName: this.deleteRoom.name,
+        error: error,
       });
+    }
+
+    return {
+      deletedRoomId: roomId,
+    };
+  }
+  // ---------------------------- ROOMS LOGIC STARTS ----------------------------
+
+  // ---------------------------- AVAILABLE SLOTS LOGIC STARTS ----------------------------
+  public getAvailableSlotsByRoomId(roomId: string) {
+    const roomData = this.getRoomById(roomId);
+
+    return this.availableSlots.get(roomData.id) || [];
+  }
+
+  public createAvailableSlotsByRoomId(roomData: Rooms) {
+    this.availableSlots.set(
+      roomData.id,
+      this.getAvailableBookingSlots(roomData),
+    );
+  }
+
+  public editAvailableSlotsByRoomId(
+    roomId: string,
+    startsAt: string,
+    endsAt: string,
+    booked: boolean = false,
+  ) {
+    let roomIndex = -1;
+    const roomBooking = this.getAvailableSlotsByRoomId(roomId).filter(
+      (roomBooking, index) => {
+        if (
+          new Date(roomBooking.startsAt).getTime() ===
+            new Date(startsAt).getTime() &&
+          new Date(roomBooking.endsAt).getTime() === new Date(endsAt).getTime()
+        ) {
+          roomIndex = index;
+          return true;
+        }
+        return false;
+      },
+    )[0];
+
+    console.log(
+      'editAvailableSlotsByRoomId: ',
+      roomId,
+      startsAt,
+      endsAt,
+      booked,
+      roomIndex,
+      roomBooking,
+    );
+    const updateAvailableSlots = this.availableSlots.get(roomId);
+
+    if (updateAvailableSlots && roomIndex !== -1) {
+      roomBooking.booked = booked;
+      updateAvailableSlots[roomIndex] = roomBooking;
+      this.availableSlots.set(roomId, updateAvailableSlots);
+    } else {
+      throw new Error('Could not update available slots for room.');
+    }
+  }
+
+  public removeAvailableSlotsByRoomId(roomId: string) {
+    this.availableSlots.delete(roomId);
   }
 }

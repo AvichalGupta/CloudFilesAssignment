@@ -10,10 +10,12 @@ import { AuthModule } from './auth/auth.module';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth/auth.controller';
 import * as dotenv from 'dotenv';
+import { RoomsAndBookingsModule } from './commonService/roomsAndBookings.module';
 dotenv.config();
 
 @Module({
   imports: [
+    RoomsAndBookingsModule,
     UsersModule,
     LendersModule,
     OrganisationsModule,

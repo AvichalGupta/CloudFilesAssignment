@@ -43,7 +43,7 @@ export class AuthGuard implements CanActivate {
     if (!payload.type) {
       throw new ForbiddenException({
         statusCode: HttpStatus.FORBIDDEN,
-        message: 'Cannot access resource',
+        message: 'Cannot access resource, Please login first.',
       });
     }
 
@@ -53,22 +53,36 @@ export class AuthGuard implements CanActivate {
       if (payload.type !== Roles.LENDER) {
         throw new ForbiddenException({
           statusCode: HttpStatus.FORBIDDEN,
-          message: 'Cannot access resource',
+          message:
+            'Cannot access resource, you do not have permission to access this resource.',
         });
       }
     } else if (pathType.includes('org')) {
       if (payload.type !== Roles.ORG) {
         throw new ForbiddenException({
           statusCode: HttpStatus.FORBIDDEN,
-          message: 'Cannot access resource',
+          message:
+            'Cannot access resource, you do not have permission to access this resource.',
         });
       }
-    } else if (pathType.includes('rooms')) {
-      if (![Roles.LENDER, Roles.ORG].includes(payload.type)) {
+    } else if (pathType.includes('rooms') || pathType.includes('bookings')) {
+      if (![Roles.LENDER, Roles.ORG, Roles.USER].includes(payload.type)) {
         throw new ForbiddenException({
           statusCode: HttpStatus.FORBIDDEN,
-          message: 'Cannot access resource',
+          message:
+            'Cannot access resource, you do not have permission to access this resource.',
         });
+      } else {
+        const userType = payload.type;
+        if ([Roles.ORG, Roles.USER].includes(userType)) {
+          if (pathType.includes('rooms') && !pathType.includes('get')) {
+            throw new ForbiddenException({
+              statusCode: HttpStatus.FORBIDDEN,
+              message:
+                'Cannot access resource, you do not have permission to access this resource.',
+            });
+          }
+        }
       }
     }
     return true;

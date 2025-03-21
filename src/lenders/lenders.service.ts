@@ -49,7 +49,7 @@ export class LendersService {
 
     if (doesLenderExist) {
       throw {
-        statusCode: 400,
+        statusCode: HttpStatus.BAD_REQUEST,
         message: 'Lender alredy exists with provided email, please login.',
       };
     }

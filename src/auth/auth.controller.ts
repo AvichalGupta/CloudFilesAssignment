@@ -11,7 +11,7 @@ import {
 import { IStandardResponse, ResponseMessages } from 'src/app.interface';
 import { LendersService } from 'src/lenders/lenders.service';
 import * as bcrypt from 'bcrypt';
-import { ILoginPayload, Roles } from './auth.interface';
+import { ILoginPayload, IUserLoginPayload, Roles } from './auth.interface';
 import { JwtService } from '@nestjs/jwt';
 import { OrganisationsService } from 'src/organisations/organisations.service';
 import { UsersService } from 'src/users/users.service';
@@ -141,9 +141,9 @@ export class AuthController {
       data: {},
     };
     try {
-      const hashedPassword = await this.hashPassword(body.body.password);
-      body.body.password = hashedPassword;
-      apiResponse.data = this.orgService.addOrganisations(body.body);
+      const hashedPassword = await this.hashPassword(body.password);
+      body.password = hashedPassword;
+      apiResponse.data = this.orgService.addOrganisations(body);
     } catch (error) {
       console.error('Controller level error ', {
         fileName: AuthController.name,
@@ -197,10 +197,10 @@ export class AuthController {
         error: error,
       });
       let errorMessage: string = error.message;
+      apiResponse.statusCode = error?.statusCode || HttpStatus.BAD_REQUEST;
       if (apiResponse.statusCode === HttpStatus.NOT_FOUND) {
         errorMessage += ' Please Signup first.';
       }
-      apiResponse.statusCode = error?.statusCode || HttpStatus.BAD_REQUEST;
       apiResponse.message = errorMessage || ResponseMessages.error;
     }
     response.status(apiResponse.statusCode).send(apiResponse);
@@ -215,9 +215,9 @@ export class AuthController {
       data: {},
     };
     try {
-      const hashedPassword = await this.hashPassword(body.body.password);
-      body.body.password = hashedPassword;
-      apiResponse.data = this.userService.addUser(body.body);
+      const hashedPassword = await this.hashPassword(body.password);
+      body.password = hashedPassword;
+      apiResponse.data = this.userService.addUser(body);
     } catch (error) {
       console.error('Controller level error ', {
         fileName: AuthController.name,
@@ -234,7 +234,7 @@ export class AuthController {
   @Post('/org/user/login')
   @UsePipes(new JoiValidationPipe(userLoginSchema))
   public async userLogin(
-    @Body() body: ILoginPayload,
+    @Body() body: IUserLoginPayload,
     @Res() response,
   ): Promise<void> {
     const apiResponse: IStandardResponse = {
@@ -243,13 +243,14 @@ export class AuthController {
       data: {},
     };
     try {
-      const orgObject = this.userService.getUserByEmailOrEmployeeId({
+      const userObject = this.userService.getUserByEmailOrEmployeeId({
         email: body.email,
+        orgId: body.orgId,
       }).user;
 
       const doPasswordsMatch = await this.validatePassword(
         body.password,
-        orgObject.password,
+        userObject.password,
       );
 
       if (!doPasswordsMatch) {
@@ -259,7 +260,7 @@ export class AuthController {
         });
       }
 
-      const jwtToken = await this.generateJWTToken(orgObject.id, Roles.ORG);
+      const jwtToken = await this.generateJWTToken(userObject.id, Roles.USER);
 
       apiResponse.data = {
         token: jwtToken,
@@ -271,10 +272,10 @@ export class AuthController {
         error: error,
       });
       let errorMessage: string = error.message;
+      apiResponse.statusCode = error?.statusCode || HttpStatus.BAD_REQUEST;
       if (apiResponse.statusCode === HttpStatus.NOT_FOUND) {
         errorMessage += ' Please Signup first.';
       }
-      apiResponse.statusCode = error?.statusCode || HttpStatus.BAD_REQUEST;
       apiResponse.message = errorMessage || ResponseMessages.error;
     }
     response.status(apiResponse.statusCode).send(apiResponse);

@@ -20,4 +20,5 @@ export interface IAddUserPayload {
 export interface IGetUserByEmailPayload {
   email?: string;
   employeeId?: string;
+  orgId: string;
 }

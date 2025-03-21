@@ -1,11 +1,12 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
   HttpStatus,
+  Param,
   Patch,
   Post,
-  Query,
   Req,
   Res,
   UseGuards,
@@ -14,7 +15,10 @@ import {
 import { IStandardResponse, ResponseMessages } from 'src/app.interface';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { JoiValidationPipe } from 'src/validator/request-validator.pipe';
-import { lenderLoginSchema } from 'src/validator/request-validator.validation';
+import {
+  createBookingSchema,
+  editBookingSchema,
+} from 'src/validator/request-validator.validation';
 import { Roles } from 'src/auth/auth.interface';
 import { RoomsAndBookingService } from 'src/commonService/roomsAndBookings.service';
 
@@ -28,39 +32,22 @@ export class BookingsController {
     private readonly roomsAndBookingsService: RoomsAndBookingService,
   ) {}
   @Get('get/internal')
-  public getAllBookings(@Req() request, @Res() response) {
+  public getAllInternalBookings(@Res() response) {
     const apiResponse: IStandardResponse = {
       statusCode: HttpStatus.OK,
       message: ResponseMessages.success,
       data: {},
     };
     try {
-      apiResponse.data = this.roomsAndBookingsService.getAllBookings();
-    } catch (error) {
-      console.error('Controller level error ', {
-        fileName: BookingsController.name,
-        methodName: this.getAllBookings.name,
-        error: error,
-      });
-      const errorMessage: string = error.message;
-      apiResponse.statusCode = error?.statusCode || HttpStatus.BAD_REQUEST;
-      apiResponse.message = errorMessage || ResponseMessages.error;
-    }
-    response.status(apiResponse.statusCode).send(apiResponse);
-  }
+      const bookings = this.roomsAndBookingsService.getAllInternalBookings();
 
-  @Get('get')
-  public getAllInternalBookings(@Req() request, @Res() response) {
-    const apiResponse: IStandardResponse = {
-      statusCode: HttpStatus.OK,
-      message: ResponseMessages.success,
-      data: {},
-    };
-    try {
-      const userDataFromToken: { id: string; type: Roles } = request['user'];
-      delete request['user'];
-      apiResponse.data =
-        this.roomsAndBookingsService.getAllInternalBookings(userDataFromToken);
+      if (!bookings.length) {
+        throw {
+          statusCode: HttpStatus.NOT_FOUND,
+          message: 'No Bookings Found!!',
+        };
+      }
+      apiResponse.data = bookings;
     } catch (error) {
       console.error('Controller level error ', {
         fileName: BookingsController.name,
@@ -74,10 +61,35 @@ export class BookingsController {
     response.status(apiResponse.statusCode).send(apiResponse);
   }
 
+  @Get('get')
+  public getAllBookings(@Req() request, @Res() response) {
+    const apiResponse: IStandardResponse = {
+      statusCode: HttpStatus.OK,
+      message: ResponseMessages.success,
+      data: {},
+    };
+    try {
+      const userDataFromToken: { id: string; type: Roles } = request['user'];
+      delete request['user'];
+      apiResponse.data =
+        this.roomsAndBookingsService.getAllBookings(userDataFromToken);
+    } catch (error) {
+      console.error('Controller level error ', {
+        fileName: BookingsController.name,
+        methodName: this.getAllBookings.name,
+        error: error,
+      });
+      const errorMessage: string = error.message;
+      apiResponse.statusCode = error?.statusCode || HttpStatus.BAD_REQUEST;
+      apiResponse.message = errorMessage || ResponseMessages.error;
+    }
+    response.status(apiResponse.statusCode).send(apiResponse);
+  }
+
   @Get('get/:id')
   public getBookingById(
     @Req() request,
-    @Query('id') bookingId: string,
+    @Param('id') bookingId: string,
     @Res() response,
   ) {
     const apiResponse: IStandardResponse = {
@@ -86,6 +98,12 @@ export class BookingsController {
       data: {},
     };
     try {
+      if (!bookingId) {
+        throw {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: 'Parameter id cannot be empty',
+        };
+      }
       const userDataFromToken: { id: string; type: Roles } = request['user'];
       delete request['user'];
       apiResponse.data = this.roomsAndBookingsService.getBookingById(
@@ -105,9 +123,9 @@ export class BookingsController {
     response.status(apiResponse.statusCode).send(apiResponse);
   }
 
-  @Post('book')
-  @UsePipes(new JoiValidationPipe(lenderLoginSchema))
-  public addBookings(@Req() request, @Res() response): void {
+  @Post('create')
+  @UsePipes(new JoiValidationPipe(createBookingSchema))
+  public addBookings(@Req() request, @Body() body, @Res() response): void {
     const apiResponse: IStandardResponse = {
       statusCode: HttpStatus.OK,
       message: ResponseMessages.success,
@@ -118,7 +136,7 @@ export class BookingsController {
       delete request['user'];
       apiResponse.data = this.roomsAndBookingsService.addBooking(
         userDataFromToken,
-        request.body,
+        body,
       );
     } catch (error) {
       console.error('Controller level error ', {
@@ -134,8 +152,8 @@ export class BookingsController {
   }
 
   @Patch('edit')
-  @UsePipes(new JoiValidationPipe(lenderLoginSchema))
-  public editBookings(@Req() request, @Res() response): void {
+  @UsePipes(new JoiValidationPipe(editBookingSchema))
+  public editBookings(@Req() request, @Body() body, @Res() response): void {
     const apiResponse: IStandardResponse = {
       statusCode: HttpStatus.OK,
       message: ResponseMessages.success,
@@ -146,7 +164,7 @@ export class BookingsController {
       delete request['user'];
       apiResponse.data = this.roomsAndBookingsService.editBooking(
         userDataFromToken,
-        request.body,
+        body,
       );
     } catch (error) {
       console.error('Controller level error ', {
@@ -161,16 +179,31 @@ export class BookingsController {
     response.status(apiResponse.statusCode).send(apiResponse);
   }
 
-  @Delete('delete')
-  @UsePipes(new JoiValidationPipe(lenderLoginSchema))
-  public deleteBookings(@Req() request, @Res() response): void {
+  @Delete('delete/:id')
+  public deleteBookings(
+    @Req() request,
+    @Param('id') bookingId: string,
+    @Res() response,
+  ): void {
     const apiResponse: IStandardResponse = {
       statusCode: HttpStatus.OK,
       message: ResponseMessages.success,
       data: {},
     };
     try {
-      console.log('ho');
+      if (!bookingId) {
+        throw {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: 'Parameter id cannot be empty',
+        };
+      }
+      const userDataFromToken: { id: string; type: Roles } = request['user'];
+      delete request['user'];
+
+      apiResponse.data = this.roomsAndBookingsService.deleteBooking(
+        userDataFromToken,
+        bookingId,
+      );
     } catch (error) {
       console.error('Controller level error ', {
         fileName: BookingsController.name,

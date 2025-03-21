@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   IAddUserPayload,
   IGetUserByEmailPayload,
@@ -31,7 +31,7 @@ export class UsersService {
 
     if (!doesUserExist) {
       throw {
-        statusCode: 404,
+        statusCode: HttpStatus.NOT_FOUND,
         message: 'User does not exists with provided data.',
       };
     }
@@ -42,7 +42,7 @@ export class UsersService {
   }
 
   public addUser(requestBody: IAddUserPayload) {
-    const doesUserExist = this.users.find(
+    const doesUserExist = this.getAllUsers().find(
       (user) =>
         user.email === requestBody.email ||
         user.employeeId === requestBody.employeeId,
@@ -50,7 +50,7 @@ export class UsersService {
 
     if (doesUserExist) {
       throw {
-        statusCode: 400,
+        statusCode: HttpStatus.BAD_REQUEST,
         message: 'User alredy exists with provided email, please login.',
       };
     }

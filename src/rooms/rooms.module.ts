@@ -2,11 +2,11 @@ import { Module } from '@nestjs/common';
 import { RoomsController } from './rooms.controller';
 import { ConfigModule } from '@nestjs/config';
 import { LendersModule } from 'src/lenders/lenders.module';
-import { RoomsAndBookingService } from 'src/commonService/roomsAndBookings.service';
+import { UsersModule } from 'src/users/users.module';
+import { RoomsAndBookingsModule } from 'src/commonService/roomsAndBookings.module';
 
 @Module({
-  imports: [ConfigModule, LendersModule],
+  imports: [ConfigModule, LendersModule, UsersModule, RoomsAndBookingsModule],
   controllers: [RoomsController],
-  providers: [RoomsAndBookingService],
 })
 export class RoomsModule {}
