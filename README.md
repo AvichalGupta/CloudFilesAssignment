@@ -99,5 +99,17 @@ This project supports multiple roles — lender, organisation, and user — and 
 - Then, sign up as an organisation to create an orgId.
 - Finally, sign up as a user, log in, and book rooms.
 
-POSTMAN LINK:
+## PostMan API Testing Link
 https://elements.getpostman.com/redirect?entityId=9020780-9f9547f1-e95e-4062-8bbd-a769336b44c8&entityType=collection
+ - Please use the above link for both API testing and documentation reference.
+ - Documentation can be viewed, by clicking on the menu icon(3 dots) while hovering over the Meeting Booking API's folder. Click, see View Documentation.
+
+
+## How To Test
+- Run the Authentication > Signup Folder with dummy data, it will create a lender, org and a user.
+- Run any of the Log In API's (lender/org/user). Start using Bookings and Rooms APIs.
+
+# NOTE
+- Rooms have to be created first.
+- Bookings can only be created after a room is created.
+- API's have collection variables and scripts added to them, to enhance testing capabilities.
