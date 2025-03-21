@@ -20,6 +20,7 @@ This repository is a NestJS-based application that manages room bookings along w
    ```
    npm install
    ```
+4. Create a .env file in the root directory. Copy contents of sample_env.txt, into the .env file.
 
 ## Running the Application
 To run the application in development mode:
