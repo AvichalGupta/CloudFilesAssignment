@@ -1,5 +1,5 @@
 Flow:
-    User logs in via Gmail.
+    User logs in.
         If new User
             Ask Full Name, Photo(optional), Organisation (optional), Country, Phone Number(optional).
             Create user record.
